@@ -62,68 +62,84 @@ namespace BovineLabs.Analyzers
             {
                 XNamespace xmlns = projectContentElement.Name.NamespaceName; // do not use var
                 SetRoslynAnalyzers(projectContentElement, xmlns);
-#if UNITY_VSTU
+#if UNITY_VTSU
                 SetCSharpVersion(projectContentElement, xmlns);
 #endif
             }
         }
 
         /// <summary>
-        ///  Add everything from RoslynAnalyzers folder to csproj.
+        ///  Add everything from root RoslynAnalyzers folder and packages RoslynAnalyzers to csproj.
         /// </summary>
         private static void SetRoslynAnalyzers(XElement projectContentElement, XNamespace xmlns)
         {
             var currentDirectory = Directory.GetCurrentDirectory();
 
-            // TODO do not require strict com.bovinelabs.analyzers folder
-            var roslynAnalyzerBaseDir = new DirectoryInfo(Path.Combine(currentDirectory, Util.GetDirectory()));
-
-            if (!roslynAnalyzerBaseDir.Exists)
-            {
-                //Debug.LogWarning($"Directory {roslynAnalyzerBaseDir} does not exist, please place analyzers in correct location.");
-                return;
-            }
-
-            var relPaths = roslynAnalyzerBaseDir.GetFiles("*", SearchOption.AllDirectories)
-                    .Select(x => x.FullName.Substring(currentDirectory.Length + 1));
+            var request = UnityEditor.PackageManager.Client.List(offlineMode: true);
+            while (!request.IsCompleted) { }
 
             var itemGroup = new XElement(xmlns + "ItemGroup");
 
-            foreach (var file in relPaths)
+            ProcessFolder(currentDirectory);
+
+            foreach (var file in request.Result)
+                ProcessFolder(file.assetPath);
+
+            projectContentElement.Add(itemGroup);
+
+            void ProcessFolder(string folder)
+            {
+                foreach (var folderPartial in Util.GetDirectory().Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var roslynAnalyzerBaseDir = new DirectoryInfo(Path.Combine(folder, folderPartial));
+
+                    if (!roslynAnalyzerBaseDir.Exists)
+                    {
+                        //Debug.LogWarning($"Directory {roslynAnalyzerBaseDir} does not exist, please place analyzers in correct location.");
+                        return;
+                    }
+
+                    var relPaths = roslynAnalyzerBaseDir.GetFiles("*", SearchOption.AllDirectories)
+                            .Select(x => x.FullName.Substring(folder.Length + 1));
+
+                    foreach (var file in relPaths)
+                        AddFileToProject(file);
+                }
+            }
+
+            void AddFileToProject(string file)
             {
                 var extension = new FileInfo(file).Extension;
 
                 switch (extension)
                 {
                     case ".dll":
-                    {
-                        var reference = new XElement(xmlns + "Analyzer");
-                        reference.Add(new XAttribute("Include", file));
-                        itemGroup.Add(reference);
-                        break;
-                    }
+                        {
+                            var reference = new XElement(xmlns + "Analyzer");
+                            reference.Add(new XAttribute("Include", file));
+                            itemGroup.Add(reference);
+                            break;
+                        }
 
                     case ".json":
-                    {
-                        var reference = new XElement(xmlns + "AdditionalFiles");
-                        reference.Add(new XAttribute("Include", file));
-                        itemGroup.Add(reference);
-                        break;
-                    }
+                        {
+                            var reference = new XElement(xmlns + "AdditionalFiles");
+                            reference.Add(new XAttribute("Include", file));
+                            itemGroup.Add(reference);
+                            break;
+                        }
 
                     case ".ruleset":
-                    {
-                        SetOrUpdateProperty(projectContentElement, xmlns, "CodeAnalysisRuleSet", existing => file);
-                        break;
-                    }
+                        {
+                            SetOrUpdateProperty(projectContentElement, xmlns, "CodeAnalysisRuleSet", existing => file);
+                            break;
+                        }
                 }
             }
-
-            projectContentElement.Add(itemGroup);
         }
 
         // Don't need to do this for Rider as it has built in support for setting c# version.
-#if UNITY_VSTU
+#if UNITY_VTSU
         private static void SetCSharpVersion(XContainer projectContentElement, XNamespace ns)
         {
             // Find all PropertyGroups with Condition defining a Configuration and a Platform:

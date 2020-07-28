@@ -19,8 +19,8 @@ namespace BovineLabs.Analyzers.UI
     public class AnalyzersWindow : EditorWindow
     {
         private const string Packages = "Packages/com.bovinelabs.analyzers/";
-        private const string StyleCopDirectory = Packages + "RoslynAnalyzers/StyleCopAnalyzers/";
-        private const string ReflectionDirectory = Packages + "RoslynAnalyzers/ReflectionAnalyzers/";
+        private const string StyleCopDirectory = Packages + "RoslynAnalyzersBuildin/StyleCopAnalyzers/";
+        private const string ReflectionDirectory = Packages + "RoslynAnalyzersBuildin/ReflectionAnalyzers/";
         private const string UIDirectory = "Packages/com.bovinelabs.analyzers/UI/";
 
         [MenuItem("Window/BovineLabs/Analyzers")]
